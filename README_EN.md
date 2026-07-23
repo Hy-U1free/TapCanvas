@@ -1,0 +1,113 @@
+<p align="center">
+  <img src="assets/logo.png" alt="TapCanvas Logo" width="1000" />
+</p>
+
+<h1 align="center">TapCanvas</h1>
+
+TapCanvas is a multi-model AI content creation platform built around a visual canvas: orchestrate text, image, video and other generation workflows in one place, with fast iteration across multi-step creative pipelines.
+
+**Language:** [中文](README.md) | English
+
+## Latest Capabilities
+
+- **Video-to-image reference via frame preview**: drag a frame from the video preview directly onto the canvas to use it as a reference image for image generation.
+
+<p align="center">
+  <img src="assets/video-to-image.jpg" alt="Drag frame to generate reference image" width="1000" />
+</p>
+
+## Quick Start
+
+### Local dev (recommended)
+
+```bash
+# 1) Install deps
+pnpm install
+
+# 2) Configure env
+cp apps/web/.env.example apps/web/.env
+cp apps/hono-api/.env.example apps/hono-api/.env
+
+# 3) Start (two terminals)
+pnpm dev:web
+pnpm dev:api
+```
+
+`pnpm install` now bootstraps the workspace and generates the Prisma client for `apps/hono-api` automatically. If your environment hits file watcher limits with `pnpm dev:api`, use `pnpm dev:api:stable`.
+
+### One-command full stack (Docker)
+
+The `docker-compose.yml` lives in `apps/hono-api`. Run it from there to start the entire backend stack in one command:
+
+```bash
+cd apps/hono-api
+docker compose up -d
+```
+
+This starts:
+- `postgres` — database
+- `redis` — cache
+- `agents-bridge` — AI chat bridge
+- `api` — backend API (`http://localhost:8788`)
+- `new-api` — model gateway (`http://localhost:4455`)
+
+Then start the web frontend separately (from the repo root):
+
+```bash
+pnpm dev:web
+```
+
+Copy env files if you haven't already:
+
+```bash
+cp apps/web/.env.example apps/web/.env
+cp apps/hono-api/.env.example apps/hono-api/.env
+# Then restart if needed
+docker compose restart
+```
+
+## Architecture / Tech Stack
+
+- **Monorepo**: pnpm workspaces (`apps/`, `packages/`)
+- **Web**: Vite + React 18 + TypeScript, Mantine UI, React Flow canvas, Zustand state
+- **API**: NestJS (Node.js) + Hono (route reuse), OpenAPI 3.1 + request validation
+- **Storage**: SQLite (local), S3-compatible optional for asset hosting
+
+## Environment
+
+- Web (Vite): `apps/web/.env*`
+- API: `apps/hono-api/.env` (or `apps/hono-api/.dev.vars`)
+- Root `.env.example` is optional (scripts/tools only)
+
+## Verify
+
+- Web: `http://localhost:5173`
+- API: `http://localhost:8788`
+- API docs: `http://localhost:8788/`
+
+## Docs
+
+- `docs/README.md` (index)
+- `docs/docker.md` (Docker)
+- `docs/development.md` (local dev)
+- `docs/INTELLIGENT_AI_IMPLEMENTATION.md` (AI tool contracts)
+- `docs/AI_VIDEO_REALISM_GUIDE.md` (prompt tips)
+
+## TODO / Roadmap
+
+- **Sora 2 watermark removal**: smarter cleanup for generated videos
+- **Video stitching**: seamless multi-clip concatenation + transitions
+- **Basic video editing**: trim/split/merge inside TapCanvas
+
+## Contributing
+
+- Issues: https://github.com/anymouschina/TapCanvas/issues
+- Discussions: https://github.com/anymouschina/TapCanvas/discussions
+
+## License
+
+MIT
+
+This project has been forked as the TapCanvas **Community Edition**: only non-commercial capabilities will be updated going forward. From open source, for open source.
+
+> **Disclaimer**: The online website is the TapCanvas **Commercial Edition**, which is a separate product from the Community Edition in this repository — they differ in features and scope of service. This license applies only to the code in this repository, not to the online website.

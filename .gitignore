@@ -1,0 +1,54 @@
+# Node / PNPM
+node_modules/
+.pnpm-store/
+dist/
+.graphify-venv
+.graphify-venv311
+tmp
+!apps/web/dist/
+!apps/web/dist/**
+.turbo/
+dist-local
+graphify-out
+# Env / local (忽略真实环境文件，保留 .env.example)
+.env
+.env.local
+.env.development
+.env.production
+apps/**/.env
+apps/**/.env.local
+apps/**/.env.development
+apps/**/.env.production
+packages/**/.env
+packages/**/.env.local
+packages/**/.env.development
+packages/**/.env.production
+.npm-cache
+.tapcanvas/
+.superpowers/
+apps/web/test-results/
+# OS / misc
+.DS_Store
+*.log
+artifacts/
+orchestration
+# sora2api
+wrangler.jsonc
+.wrangler/
+.venv
+.data/
+**/.data/
+.agents
+ai-metadata
+# Python
+__pycache__/
+*.pyc
+.pycache/
+.buildx
+.xdg
+
+helloagents
+
+project-data
+
+cert

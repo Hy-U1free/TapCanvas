@@ -1,0 +1,529 @@
+import React from 'react'
+import {
+  Group,
+  Title,
+  Transition,
+  Button,
+  Stack,
+  Text,
+  ActionIcon,
+  Image,
+  Loader,
+  Center,
+  Badge,
+  Tooltip,
+  SegmentedControl,
+  useMantineColorScheme,
+  Modal,
+} from '@mantine/core'
+import { IconPlayerPlay, IconPhoto, IconCopy, IconRefresh, IconPlus, IconExternalLink, IconMessage2 } from '@tabler/icons-react'
+import { useUIStore } from './uiStore'
+import { calculateSafeMaxHeight, calculateSafePanelTop } from './utils/panelPosition'
+import { listPublicAssets, type PublicAssetDto } from '../api/server'
+import { toast } from './toast'
+import { PanelCard } from './PanelCard'
+import { setTapImageDragData } from '../canvas/dnd/setTapImageDragData'
+import { useRFStore } from '../canvas/store'
+import { useAuth } from '../auth/store'
+import { stopPanelWheelPropagation } from './utils/panelWheel'
+
+function formatDate(ts: string) {
+  const date = new Date(ts)
+  const yyyy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  const hh = String(date.getHours()).padStart(2, '0')
+  const mi = String(date.getMinutes()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`
+}
+
+export default function TapshowPanel(): JSX.Element | null {
+  const active = useUIStore((s) => s.activePanel)
+  const setActivePanel = useUIStore((s) => s.setActivePanel)
+  const anchorY = useUIStore((s) => s.panelAnchorY)
+  const openPreview = useUIStore((s) => s.openPreview)
+  const addNode = useRFStore((s) => s.addNode)
+  const token = useAuth((s) => s.token)
+  const { colorScheme } = useMantineColorScheme()
+  const isDark = colorScheme === 'dark'
+
+  const mounted = active === 'tapshow'
+  const [assets, setAssets] = React.useState<PublicAssetDto[]>([])
+  const [hasAnyAssets, setHasAnyAssets] = React.useState(false)
+  const [loading, setLoading] = React.useState(false)
+  const [refreshing, setRefreshing] = React.useState(false)
+  const [mediaFilter, setMediaFilter] = React.useState<'all' | 'image' | 'video'>('all')
+  const [visibleCount, setVisibleCount] = React.useState(10)
+  const [promptModalOpen, setPromptModalOpen] = React.useState(false)
+  const [activePrompt, setActivePrompt] = React.useState<{ title: string; prompt: string } | null>(null)
+
+  const webcutUrl = React.useMemo(() => {
+    const raw = import.meta.env.VITE_WEBCUT_URL
+    const base = typeof raw === 'string' && raw.trim() ? raw.trim() : null
+    if (!base) return null
+    if (!token) return base
+    try {
+      const url = new URL(base, typeof window !== 'undefined' ? window.location.origin : undefined)
+      url.searchParams.set('tap_token', token)
+      return url.toString()
+    } catch {
+      const [path, hash] = base.split('#')
+      const sep = path.includes('?') ? '&' : '?'
+      return `${path}${sep}tap_token=${encodeURIComponent(token)}${hash ? `#${hash}` : ''}`
+    }
+  }, [token])
+
+  const maxHeight = calculateSafeMaxHeight(anchorY, 150)
+  const panelTop = calculateSafePanelTop(anchorY, 150)
+
+  const reloadAssets = React.useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await listPublicAssets(48, mediaFilter)
+      const safeData = data || []
+      setAssets(safeData)
+      if (safeData.length > 0) {
+        setHasAnyAssets(true)
+      }
+    } catch (err: any) {
+      console.error(err)
+      toast(err?.message || '加载资产失败', 'error')
+      setAssets([])
+    } finally {
+      setLoading(false)
+    }
+  }, [mediaFilter])
+
+  React.useEffect(() => {
+    if (!mounted) return
+    reloadAssets().catch(() => {})
+  }, [mounted, reloadAssets])
+
+  const hostedAssets = assets
+  const filteredAssets = React.useMemo(() => {
+    if (mediaFilter === 'all') return hostedAssets
+    return hostedAssets.filter((asset) => asset.type === mediaFilter)
+  }, [hostedAssets, mediaFilter])
+  const visibleAssets = React.useMemo(
+    () => filteredAssets.slice(0, Math.max(10, visibleCount)),
+    [filteredAssets, visibleCount],
+  )
+  const flowColumns = React.useMemo(() => {
+    const columns: PublicAssetDto[][] = [[], []]
+    visibleAssets.forEach((asset, index) => {
+      columns[index % columns.length].push(asset)
+    })
+    return columns
+  }, [visibleAssets])
+
+  React.useEffect(() => {
+    // 重置可见数量，避免切换过滤后停在列表末尾
+    setVisibleCount(10)
+  }, [mediaFilter, assets])
+
+  const handleScroll: React.UIEventHandler<HTMLDivElement> = (event) => {
+    const el = event.currentTarget
+    const threshold = 80
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - threshold) {
+      if (visibleCount < filteredAssets.length) {
+        setVisibleCount((prev) => Math.min(prev + 10, filteredAssets.length))
+      }
+    }
+  }
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast('已复制链接', 'success')
+    } catch (err) {
+      console.error(err)
+      toast('复制失败，请手动复制', 'error')
+    }
+  }
+
+  const handleViewPrompt = React.useCallback((asset: PublicAssetDto) => {
+    const prompt = String(asset.prompt || '').trim()
+    if (!prompt) {
+      toast('该作品暂无可展示提示词', 'info')
+      return
+    }
+    const title = String(asset.name || (asset.type === 'video' ? '视频作品' : '图片作品') || 'TapShow 作品').trim()
+    setActivePrompt({ title, prompt })
+    setPromptModalOpen(true)
+  }, [])
+
+  const handleCopyPrompt = React.useCallback(async () => {
+    const prompt = String(activePrompt?.prompt || '').trim()
+    if (!prompt) return
+    try {
+      await navigator.clipboard.writeText(prompt)
+      toast('已复制提示词', 'success')
+    } catch (err) {
+      console.error(err)
+      toast('复制提示词失败，请手动复制', 'error')
+    }
+  }, [activePrompt?.prompt])
+
+  const handleRefresh = () => {
+    setRefreshing(true)
+    reloadAssets()
+      .catch(() => {})
+      .finally(() => setRefreshing(false))
+  }
+
+  if (!mounted) return null
+
+  return (
+    <div className="tapshow-panel-anchor" style={{ position: 'fixed', left: 82, top: panelTop, zIndex: 200 }} data-ux-panel>
+      <Transition className="tapshow-panel-transition" mounted={mounted} transition="pop" duration={140} timingFunction="ease">
+        {(styles) => (
+          <div className="tapshow-panel-transition-inner" style={styles}>
+            <PanelCard
+              className="glass"
+              style={{
+                width: 660,
+                maxHeight: `${maxHeight}px`,
+                minHeight: 0,
+                transformOrigin: 'left center',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+              onWheelCapture={stopPanelWheelPropagation}
+              data-ux-panel
+            >
+              <div className="tapshow-panel-arrow panel-arrow" />
+              <Group
+                className="tapshow-panel-header"
+                justify="space-between"
+                mb={8}
+                style={{ position: 'sticky', top: 0, zIndex: 1, background: 'transparent' }}
+              >
+                <Stack className="tapshow-panel-header-info" gap={2}>
+                  <Title className="tapshow-panel-title" order={6}>TapShow</Title>
+                  <Text className="tapshow-panel-subtitle" size="xs" c="dimmed">
+                    展示公开图片 / 视频作品，不再限定为当前 publicBase 托管地址
+                  </Text>
+                </Stack>
+                <Group className="tapshow-panel-header-actions" gap="xs">
+                  <Tooltip className="tapshow-panel-preview-tooltip" label="全屏预览" withArrow>
+                    <ActionIcon
+                      className="tapshow-panel-preview-action"
+                      size="sm"
+                      variant="subtle"
+                      onClick={() => {
+                        try {
+                          const url = new URL(window.location.href)
+                          url.pathname = '/tapshow'
+                          url.search = ''
+                          url.hash = ''
+                          window.open(url.toString(), '_blank', 'noopener,noreferrer')
+                        } catch {
+                          window.open('/tapshow', '_blank', 'noopener,noreferrer')
+                        }
+                      }}
+                    >
+                      <IconPlayerPlay className="tapshow-panel-preview-icon" size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                  {webcutUrl && (
+                    <Tooltip className="tapshow-panel-webcut-tooltip" label="打开 WebCut" withArrow>
+                      <ActionIcon
+                        className="tapshow-panel-webcut-action"
+                        size="sm"
+                        variant="subtle"
+                        component="a"
+                        href={webcutUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <IconExternalLink className="tapshow-panel-webcut-icon" size={16} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                  <Tooltip className="tapshow-panel-refresh-tooltip" label="刷新" withArrow>
+                    <ActionIcon
+                      className="tapshow-panel-refresh-action"
+                      size="sm"
+                      variant="light"
+                      onClick={handleRefresh}
+                      loading={refreshing || loading}
+                    >
+                      <IconRefresh className="tapshow-panel-refresh-icon" size={16} />
+                    </ActionIcon>
+                  </Tooltip>
+                  <Button className="tapshow-panel-close" size="xs" variant="subtle" onClick={() => setActivePanel(null)}>
+                    关闭
+                  </Button>
+                </Group>
+              </Group>
+
+              <div className="tapshow-panel-body" style={{ flex: 1, overflowY: 'auto', paddingRight: 4, minHeight: 0 }} onScroll={handleScroll}>
+                {loading && !hostedAssets.length ? (
+                  <Center className="tapshow-panel-loading" py="md">
+                    <Group className="tapshow-panel-loading-group" gap="xs">
+                      <Loader className="tapshow-panel-loading-icon" size="sm" />
+                      <Text className="tapshow-panel-loading-text" size="xs" c="dimmed">
+                        加载中…
+                      </Text>
+                    </Group>
+                  </Center>
+                ) : (
+                  <>
+                    {!hasAnyAssets && !loading && (
+                      <Text className="tapshow-panel-empty" size="xs" c="dimmed">
+                        暂无公开作品。只要资产记录里带有图片 / 视频类型和 URL，就会出现在这里。
+                      </Text>
+                    )}
+                    {hasAnyAssets && (
+                      <Group className="tapshow-panel-filter" justify="space-between" align="center" mb="xs">
+                        <Text className="tapshow-panel-filter-text" size="sm" c="dimmed">
+                          TapShow 公开作品（默认显示全部，可切换视频 / 图片）
+                        </Text>
+                        <SegmentedControl
+                          className="tapshow-panel-filter-control"
+                          size="sm"
+                          radius="md"
+                          variant="filled"
+                          color={isDark ? 'blue' : 'dark'}
+                          value={mediaFilter}
+                          onChange={(v) => setMediaFilter(v as any)}
+                          data={[
+                            { value: 'video', label: '视频' },
+                            { value: 'image', label: '图片' },
+                            { value: 'all', label: '全部' },
+                          ]}
+                        />
+                      </Group>
+                    )}
+                    {hasAnyAssets && !loading && filteredAssets.length === 0 && (
+                      <Text className="tapshow-panel-filter-empty" size="xs" c="dimmed">
+                        当前筛选下暂无作品。
+                      </Text>
+                    )}
+                    {visibleAssets.length > 0 && (
+                      <div
+                        className="tapshow-panel-grid"
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                          gap: 'var(--mantine-spacing-sm)',
+                          alignItems: 'start',
+                        }}
+                      >
+                        {flowColumns.map((columnAssets, columnIndex) => (
+                          <Stack className="tapshow-panel-grid-column" key={`tapshow-column-${columnIndex}`} gap="sm">
+                            {columnAssets.map((asset) => {
+                          const isVideo = asset.type === 'video'
+                          const cover = asset.thumbnailUrl || asset.url
+                          const label = asset.name || (isVideo ? '视频资产' : '图片资产')
+                          return (
+                            <PanelCard
+                              className="tapshow-panel-card"
+                              key={asset.id}
+                              padding="compact"
+                            >
+                              {isVideo ? (
+                                asset.url ? (
+                                  <div
+                                    className="tapshow-panel-card-media"
+                                    style={{
+                                      borderRadius: 8,
+                                      overflow: 'hidden',
+                                      height: 160,
+                                    }}
+                                  >
+                                    <video
+                                      className="tapshow-panel-card-video"
+                                      src={asset.url}
+                                      poster={cover || undefined}
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover',
+                                        display: 'block',
+                                      }}
+                                      controls
+                                      playsInline
+                                    />
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="tapshow-panel-card-fallback"
+                                    style={{
+                                      height: 160,
+                                      borderRadius: 8,
+                                    }}
+                                  />
+                                )
+                              ) : cover ? (
+                                <Image
+                                  className="tapshow-panel-card-image"
+                                  src={cover}
+                                  alt={label}
+                                  radius="sm"
+                                  height={160}
+                                  fit="cover"
+                                  draggable
+                                  onDragStart={(evt) => setTapImageDragData(evt as any, cover)}
+                                />
+                              ) : (
+                                <div
+                                  className="tapshow-panel-card-fallback"
+                                  style={{
+                                    height: 160,
+                                    borderRadius: 8,
+                                  }}
+                                />
+                              )}
+                              <Stack className="tapshow-panel-card-body" gap={6} mt="sm" px="sm" pb={asset.url ? 'xs' : 0}>
+                                <Group className="tapshow-panel-card-badges" gap="xs">
+                                  <Badge
+                                    className="tapshow-panel-card-type"
+                                    size="xs"
+                                    color={isVideo ? 'violet' : 'teal'}
+                                    leftSection={
+                                      isVideo ? <IconPlayerPlay className="tapshow-panel-card-type-icon" size={12} /> : <IconPhoto className="tapshow-panel-card-type-icon" size={12} />
+                                    }
+                                  >
+                                    {isVideo ? '视频' : '图片'}
+                                  </Badge>
+                                  {asset.modelKey && (
+                                    <Badge className="tapshow-panel-card-model" size="xs" variant="light">
+                                      {asset.modelKey}
+                                    </Badge>
+                                  )}
+                                  {asset.vendor && (
+                                    <Badge className="tapshow-panel-card-vendor" size="xs" variant="outline">
+                                      {asset.vendor}
+                                    </Badge>
+                                  )}
+                                  {asset.ownerLogin && (
+                                    <Badge className="tapshow-panel-card-owner" size="xs" variant="outline">
+                                      {asset.ownerLogin}
+                                    </Badge>
+                                  )}
+                                </Group>
+                                <Text className="tapshow-panel-card-title" size="sm" fw={600} lineClamp={1}>
+                                  {label}
+                                </Text>
+                                {asset.prompt && (
+                                  <Text className="tapshow-panel-card-prompt" size="xs" c="dimmed" lineClamp={2}>
+                                    {asset.prompt}
+                                  </Text>
+                                )}
+                                <Text className="tapshow-panel-card-date" size="xs" c="dimmed">
+                                  {formatDate(asset.createdAt)}
+                                </Text>
+                                <Group className="tapshow-panel-card-actions" justify="flex-end" gap={4}>
+                                  {asset.prompt && (
+                                    <Tooltip className="tapshow-panel-card-prompt-tooltip" label="查看提示词" withArrow>
+                                      <ActionIcon
+                                        className="tapshow-panel-card-prompt-action"
+                                        size="sm"
+                                        variant="subtle"
+                                        onClick={() => handleViewPrompt(asset)}
+                                      >
+                                        <IconMessage2 className="tapshow-panel-card-prompt-icon" size={16} />
+                                      </ActionIcon>
+                                    </Tooltip>
+                                  )}
+                                  {asset.url && (
+                                    <Tooltip className="tapshow-panel-card-preview-tooltip" label="预览" withArrow>
+                                      <ActionIcon
+                                        className="tapshow-panel-card-preview-action"
+                                        size="sm"
+                                        variant="subtle"
+                                        onClick={() =>
+                                          openPreview({
+                                            url: asset.url || '',
+                                            kind: isVideo ? 'video' : 'image',
+                                            name: label,
+                                          })
+                                        }
+                                      >
+                                        {isVideo ? <IconPlayerPlay className="tapshow-panel-card-preview-icon" size={16} /> : <IconPhoto className="tapshow-panel-card-preview-icon" size={16} />}
+                                      </ActionIcon>
+                                    </Tooltip>
+                                  )}
+                                  {asset.url && (
+                                    <Tooltip className="tapshow-panel-card-add-tooltip" label="加入画布" withArrow>
+                                      <ActionIcon
+                                        className="tapshow-panel-card-add-action"
+                                        size="sm"
+                                        variant="light"
+                                        onClick={() => {
+                                          const kind = isVideo ? 'video' : 'image'
+                                          addNode('taskNode', label, {
+                                            kind,
+                                            autoLabel: false,
+                                            prompt: asset.prompt || '',
+                                            imageUrl: !isVideo ? asset.url : undefined,
+                                            videoUrl: isVideo ? asset.url : undefined,
+                                            videoThumbnailUrl: isVideo ? asset.thumbnailUrl || undefined : undefined,
+                                            imageResults:
+                                              !isVideo && asset.url ? [{ url: asset.url }] : undefined,
+                                            videoResults:
+                                              isVideo && asset.url
+                                                ? [{ url: asset.url, thumbnailUrl: asset.thumbnailUrl || undefined }]
+                                                : undefined,
+                                            modelKey: asset.modelKey || undefined,
+                                            source: asset.vendor || 'tapshow',
+                                          })
+                                          setActivePanel(null)
+                                        }}
+                                      >
+                                        <IconPlus className="tapshow-panel-card-add-icon" size={16} />
+                                      </ActionIcon>
+                                    </Tooltip>
+                                  )}
+                                  {asset.url && (
+                                    <Tooltip className="tapshow-panel-card-copy-tooltip" label="复制链接" withArrow>
+                                      <ActionIcon
+                                        className="tapshow-panel-card-copy-action"
+                                        size="sm"
+                                        variant="subtle"
+                                        onClick={() => handleCopy(asset.url || '')}
+                                      >
+                                        <IconCopy className="tapshow-panel-card-copy-icon" size={16} />
+                                      </ActionIcon>
+                                    </Tooltip>
+                                  )}
+                                </Group>
+                              </Stack>
+                            </PanelCard>
+                          )
+                            })}
+                          </Stack>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </PanelCard>
+          </div>
+        )}
+      </Transition>
+      <Modal
+        className="tapshow-panel-prompt-modal"
+        opened={promptModalOpen}
+        onClose={() => setPromptModalOpen(false)}
+        title={`提示词 · ${activePrompt?.title || 'TapShow 作品'}`}
+        size="lg"
+        centered
+      >
+        <Stack className="tapshow-panel-prompt-modal-stack" gap="sm">
+          <Group className="tapshow-panel-prompt-modal-actions" justify="flex-end">
+            <Button className="tapshow-panel-prompt-modal-copy" size="xs" variant="light" leftSection={<IconCopy size={14} />} onClick={() => { void handleCopyPrompt() }}>
+              复制提示词
+            </Button>
+          </Group>
+          <Text className="tapshow-panel-prompt-modal-content" size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+            {String(activePrompt?.prompt || '').trim() || '暂无提示词'}
+          </Text>
+        </Stack>
+      </Modal>
+    </div>
+  )
+}

@@ -1,0 +1,44 @@
+name: Deploy Web to Cloudflare Worker Assets
+
+on:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+jobs:
+  deploy-web:
+    runs-on: ubuntu-latest
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm -w install
+
+      - name: Build web app
+        run: pnpm --filter @tapcanvas/web build
+        env:
+          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+          VITE_GITHUB_CLIENT_ID: ${{ vars.VITE_GITHUB_CLIENT_ID }}
+          VITE_GITHUB_REDIRECT_URI: ${{ vars.VITE_GITHUB_REDIRECT_URI }}
+          VITE_LANGGRAPH_API_URL: ${{ vars.VITE_LANGGRAPH_API_URL }}
+
+      - name: Deploy web to Cloudflare Worker Assets
+        run: npx wrangler deploy
