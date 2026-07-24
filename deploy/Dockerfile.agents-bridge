@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:22-bookworm-slim AS build
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=${PNPM_HOME}:${PATH}
+
+RUN corepack enable && corepack prepare pnpm@10.8.1 --activate
+
+WORKDIR /opt/tapcanvas
+
+COPY apps/agents-cli/package.json apps/agents-cli/pnpm-lock.yaml ./
+
+RUN --mount=type=cache,target=/pnpm/store,sharing=locked \
+    pnpm install --frozen-lockfile
+
+COPY apps/agents-cli/tsconfig.json ./
+COPY apps/agents-cli/src ./src
+COPY apps/agents-cli/skills ./skills
+
+RUN pnpm build && pnpm prune --prod
+
+FROM node:22-bookworm-slim AS runtime
+
+ENV NODE_ENV=production \
+    AGENTS_PROFILE=code \
+    AGENTS_WORKSPACE_ROOT=/runtime/workspace \
+    AGENTS_SKILLS_DIR=/opt/tapcanvas/skills
+
+WORKDIR /runtime/workspace
+
+COPY --from=build --chown=node:node /opt/tapcanvas/node_modules /opt/tapcanvas/node_modules
+COPY --from=build --chown=node:node /opt/tapcanvas/dist /opt/tapcanvas/dist
+COPY --from=build --chown=node:node /opt/tapcanvas/skills /opt/tapcanvas/skills
+
+USER node
+
+EXPOSE 8799
+
+CMD ["node", "/opt/tapcanvas/dist/cli/index.js", "serve", "--host", "0.0.0.0", "--port", "8799", "--body-limit", "8000000"]

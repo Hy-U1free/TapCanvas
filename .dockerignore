@@ -1,0 +1,17 @@
+.git
+.github
+.pnpm-store
+.tapcanvas
+.superpowers
+node_modules
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+project-data
+graphify-out
+artifacts
+coverage
+test-results
+playwright-report
+*.log

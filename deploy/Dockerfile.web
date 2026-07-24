@@ -1,0 +1,33 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:22-bookworm-slim AS build
+
+ARG VITE_API_BASE=/api
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=${PNPM_HOME}:${PATH}
+ENV VITE_API_BASE=${VITE_API_BASE}
+
+RUN corepack enable && corepack prepare pnpm@10.8.1 --activate
+
+WORKDIR /workspace
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/web/package.json ./apps/web/package.json
+COPY apps/hono-api/package.json ./apps/hono-api/package.json
+COPY packages ./packages
+
+RUN --mount=type=cache,target=/pnpm/store,sharing=locked \
+    pnpm install --frozen-lockfile --filter @tapcanvas/web...
+
+COPY apps/web ./apps/web
+COPY apps/hono-api/src ./apps/hono-api/src
+
+RUN pnpm --filter @tapcanvas/web build
+
+FROM nginx:1.27-alpine AS runtime
+
+COPY deploy/nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /workspace/apps/web/dist /usr/share/nginx/html
+
+EXPOSE 80

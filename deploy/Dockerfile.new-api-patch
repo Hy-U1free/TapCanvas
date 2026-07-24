@@ -1,0 +1,8 @@
+FROM postgres:16-alpine
+
+COPY apps/new-api/patches /patches
+COPY deploy/scripts/apply-new-api-patches.sh /usr/local/bin/apply-new-api-patches
+
+RUN chmod 0555 /usr/local/bin/apply-new-api-patches
+
+ENTRYPOINT ["/usr/local/bin/apply-new-api-patches"]

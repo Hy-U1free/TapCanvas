@@ -1,0 +1,29 @@
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+      args:
+        VITE_API_BASE: /api
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+
+  agents-bridge:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.agents-bridge
+
+  new-api:
+    build:
+      context: ../apps/new-api
+      dockerfile: Dockerfile
+      args:
+        SKIP_WEB_BUILD: "0"
+
+  new-api-database-init:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.new-api-patch

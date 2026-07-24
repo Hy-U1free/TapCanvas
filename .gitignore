@@ -19,6 +19,7 @@ apps/**/.env
 apps/**/.env.local
 apps/**/.env.development
 apps/**/.env.production
+!deploy/.env.example
 packages/**/.env
 packages/**/.env.local
 packages/**/.env.development

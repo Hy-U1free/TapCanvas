@@ -1,0 +1,184 @@
+name: ${COMPOSE_PROJECT_NAME:-tapcanvas}
+
+services:
+  web:
+    image: ${TAPCANVAS_WEB_IMAGE:?Set TAPCANVAS_WEB_IMAGE in deploy/.env}
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 10
+
+  api:
+    image: ${TAPCANVAS_API_IMAGE:?Set TAPCANVAS_API_IMAGE in deploy/.env}
+    pull_policy: always
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ./.env
+    environment:
+      NODE_ENV: production
+      PORT: 8788
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in deploy/.env}?schema=public
+      REDIS_URL: redis://redis:6379
+      AGENTS_BRIDGE_AUTOSTART: "0"
+      AGENTS_BRIDGE_BASE_URL: http://agents-bridge:8799
+      NEW_API_INTERNAL_BASE_URL: http://new-api:4455
+      NEW_API_SQL_DSN: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${NEW_API_POSTGRES_DB:?Set NEW_API_POSTGRES_DB in deploy/.env}
+      TAPCANVAS_API_INTERNAL_BASE: http://api:8788
+      PG_BACKUP_DIR: /app/backups
+    volumes:
+      - tapcanvas_project_data:/app/project-data
+      - tapcanvas_api_backups:/app/backups
+      - tapcanvas_wechat_cert:/app/cert:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      agents-bridge:
+        condition: service_healthy
+      new-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8788/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  agents-bridge:
+    image: ${TAPCANVAS_AGENTS_BRIDGE_IMAGE:?Set TAPCANVAS_AGENTS_BRIDGE_IMAGE in deploy/.env}
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      AGENTS_PROFILE: code
+      AGENTS_API_BASE_URL: http://new-api:4455/v1
+      AGENTS_API_STYLE: responses
+      AGENTS_STREAM: "true"
+      AGENTS_BRIDGE_TIMEOUT_MS: "1800000"
+      AGENTS_BRIDGE_BODY_LIMIT_BYTES: "8000000"
+      AGENTS_REQUEST_TIMEOUT_MS: "1800000"
+      AGENTS_RESPONSES_POLL_TIMEOUT_MS: "120000"
+      AGENTS_RESPONSES_POLL_INTERVAL_MS: "1000"
+      AGENTS_RESPONSES_IN_PROGRESS_RETRIES: "5"
+      AGENTS_BRIDGE_MAX_CONCURRENCY: "16"
+      AGENTS_REDIS_URL: redis://redis:6379
+      AGENTS_SESSION_CACHE_TTL_SECONDS: "600"
+      AGENTS_WORKSPACE_ROOT: /runtime/workspace
+      AGENTS_SKILLS_DIR: /opt/tapcanvas/skills
+    volumes:
+      - tapcanvas_project_data:/runtime/workspace/project-data
+      - tapcanvas_agents_runtime:/runtime/workspace/.agents
+    depends_on:
+      redis:
+        condition: service_healthy
+      new-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8799/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+
+  new-api:
+    image: ${NEW_API_IMAGE:?Set NEW_API_IMAGE in deploy/.env}
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      PORT: 4455
+      SQL_DSN: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${NEW_API_POSTGRES_DB:?Set NEW_API_POSTGRES_DB in deploy/.env}
+      REDIS_CONN_STRING: redis://redis:6379
+      TAPCANVAS_INTERNAL_TOKEN: ${NEW_API_INTERNAL_TOKEN:?Set NEW_API_INTERNAL_TOKEN in deploy/.env}
+      WEB_DIST_DIR: /runtime/web/dist
+    volumes:
+      - tapcanvas_new_api_data:/data
+      - tapcanvas_new_api_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:4455/api/status | grep -q '\"success\"' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in deploy/.env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      - tapcanvas_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    pull_policy: always
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - tapcanvas_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  database-init:
+    image: ${TAPCANVAS_API_IMAGE:?Set TAPCANVAS_API_IMAGE in deploy/.env}
+    pull_policy: always
+    profiles: ["database-init"]
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in deploy/.env}?schema=public
+    command: ["node", "scripts/bootstrap-postgres-schema.mjs"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  new-api-database-init:
+    image: ${TAPCANVAS_NEW_API_PATCH_IMAGE:?Set TAPCANVAS_NEW_API_PATCH_IMAGE in deploy/.env}
+    pull_policy: always
+    profiles: ["database-init"]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+      NEW_API_PATCH_DB_HOST: postgres
+      NEW_API_PATCH_DB_PORT: "5432"
+      NEW_API_PATCH_DB_NAME: ${NEW_API_POSTGRES_DB:?Set NEW_API_POSTGRES_DB in deploy/.env}
+      NEW_API_PATCH_DB_USER: ${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  tapcanvas_postgres:
+  tapcanvas_redis:
+  tapcanvas_project_data:
+  tapcanvas_api_backups:
+  tapcanvas_wechat_cert:
+  tapcanvas_agents_runtime:
+  tapcanvas_new_api_data:
+  tapcanvas_new_api_logs:

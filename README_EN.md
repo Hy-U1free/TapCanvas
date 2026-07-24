@@ -66,6 +66,10 @@ cp apps/hono-api/.env.example apps/hono-api/.env
 docker compose restart
 ```
 
+### Production image deployment
+
+The source-mounted Compose file above is for local development. For deployment from immutable container images, use [`deploy/README.md`](deploy/README.md). The production Compose file does not mount source code or install dependencies at startup, and database initialization remains an explicit operation.
+
 ## Architecture / Tech Stack
 
 - **Monorepo**: pnpm workspaces (`apps/`, `packages/`)

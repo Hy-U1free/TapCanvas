@@ -1,0 +1,47 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:22-bookworm-slim AS build
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=${PNPM_HOME}:${PATH}
+
+RUN corepack enable && corepack prepare pnpm@10.8.1 --activate
+
+WORKDIR /app
+
+COPY apps/hono-api/package.json apps/hono-api/pnpm-lock.yaml ./
+COPY apps/hono-api/prisma ./prisma
+
+RUN --mount=type=cache,target=/pnpm/store,sharing=locked \
+    pnpm install --frozen-lockfile
+
+COPY apps/hono-api/tsconfig.json apps/hono-api/tsconfig.base.json ./
+COPY apps/hono-api/schema.sql ./
+COPY apps/hono-api/scripts ./scripts
+COPY apps/hono-api/src ./src
+
+RUN pnpm build && pnpm prune --prod
+
+FROM node:22-bookworm-slim AS runtime
+
+ENV NODE_ENV=production
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-pil fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/dist ./dist
+COPY --from=build --chown=node:node /app/prisma ./prisma
+COPY --from=build --chown=node:node /app/scripts/bootstrap-postgres-schema.mjs ./scripts/bootstrap-postgres-schema.mjs
+COPY --from=build --chown=node:node /app/schema.sql ./schema.sql
+COPY --chown=node:node packages/schemas /packages/schemas
+COPY --chown=node:node apps/agents-cli/skills/tapcanvas-collage-local/scripts/collage.py ./skills/tapcanvas-collage-local/scripts/collage.py
+
+USER node
+
+EXPOSE 8788
+
+CMD ["node", "dist/main.js"]
