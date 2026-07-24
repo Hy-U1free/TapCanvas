@@ -20,7 +20,7 @@ COPY apps/hono-api/schema.sql ./
 COPY apps/hono-api/scripts ./scripts
 COPY apps/hono-api/src ./src
 
-RUN pnpm build && pnpm prune --prod
+RUN pnpm build && pnpm prune --prod --ignore-scripts
 
 FROM node:22-bookworm-slim AS runtime
 
