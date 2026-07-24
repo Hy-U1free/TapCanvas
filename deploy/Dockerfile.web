@@ -12,7 +12,7 @@ RUN corepack enable && corepack prepare pnpm@10.8.1 --activate
 
 WORKDIR /workspace
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/web/package.json ./apps/web/package.json
 COPY apps/hono-api/package.json ./apps/hono-api/package.json
 COPY packages ./packages
