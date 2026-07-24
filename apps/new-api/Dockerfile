@@ -5,7 +5,7 @@ ARG RUNTIME_IMAGE=${DOCKERHUB_REGISTRY}/debian:bookworm-slim@sha256:f06537653ac7
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 ARG GO_PROXY=https://goproxy.cn,direct
 ARG APT_MIRROR=deb.debian.org
-ARG SKIP_WEB_BUILD=0
+ARG SKIP_WEB_BUILD=1
 ARG HTTP_PROXY=
 ARG HTTPS_PROXY=
 ARG NO_PROXY=
@@ -40,8 +40,7 @@ WORKDIR /build
 COPY ./web .
 COPY ./VERSION .
 RUN if [ "${SKIP_WEB_BUILD}" = "1" ]; then \
-      mkdir -p /build/dist && \
-      printf '%s\n' '<!doctype html><html><head><meta charset="utf-8"><title>new-api</title></head><body><div id="root"></div></body></html>' > /build/dist/index.html; \
+      test -f /build/dist/index.html || { echo "web/dist/index.html is required when SKIP_WEB_BUILD=1" >&2; exit 1; }; \
     else \
       test -f bun.lock || { echo "web/bun.lock is required when SKIP_WEB_BUILD!=1" >&2; exit 1; } && \
       DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat VERSION) bun run build; \

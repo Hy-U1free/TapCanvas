@@ -21,7 +21,7 @@ services:
       context: ../apps/new-api
       dockerfile: Dockerfile
       args:
-        SKIP_WEB_BUILD: "0"
+        SKIP_WEB_BUILD: "1"
 
   new-api-database-init:
     build:

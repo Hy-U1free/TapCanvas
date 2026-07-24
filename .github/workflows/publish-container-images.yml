@@ -13,6 +13,35 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Web
+            image: tapcanvas-web
+            context: .
+            file: deploy/Dockerfile.web
+            cache_scope: web
+          - name: API
+            image: tapcanvas-api
+            context: .
+            file: deploy/Dockerfile.api
+            cache_scope: api
+          - name: Agents Bridge
+            image: tapcanvas-agents-bridge
+            context: .
+            file: deploy/Dockerfile.agents-bridge
+            cache_scope: agents-bridge
+          - name: New API
+            image: tapcanvas-new-api
+            context: apps/new-api
+            file: apps/new-api/Dockerfile
+            cache_scope: new-api
+          - name: New API database initializer
+            image: tapcanvas-new-api-patch
+            context: .
+            file: deploy/Dockerfile.new-api-patch
+            cache_scope: new-api-patch
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -32,62 +61,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish Web image
+      - name: Publish ${{ matrix.name }} image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: deploy/Dockerfile.web
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           push: true
           tags: |
-            ghcr.io/${{ steps.registry.outputs.namespace }}/tapcanvas-web:sha-${{ github.sha }}
-            ghcr.io/${{ steps.registry.outputs.namespace }}/tapcanvas-web:${{ github.ref_name }}
-          cache-from: type=gha,scope=web
-          cache-to: type=gha,mode=max,scope=web
-
-      - name: Publish API image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/Dockerfile.api
-          push: true
-          tags: |
-            ghcr.io/${{ steps.registry.outputs.namespace }}/tapcanvas-api:sha-${{ github.sha }}
-            ghcr.io/${{ steps.registry.outputs.namespace }}/tapcanvas-api:${{ github.ref_name }}
-          cache-from: type=gha,scope=api
-          cache-to: type=gha,mode=max,scope=api
-
-      - name: Publish Agents Bridge image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/Dockerfile.agents-bridge
-          push: true
-          tags: |
-            ghcr.io/${{ steps.registry.outputs.namespace }}/tapcanvas-agents-bridge:sha-${{ github.sha }}
-            ghcr.io/${{ steps.registry.outputs.namespace }}/tapcanvas-agents-bridge:${{ github.ref_name }}
-          cache-from: type=gha,scope=agents-bridge
-          cache-to: type=gha,mode=max,scope=agents-bridge
-
-      - name: Publish New API image
-        uses: docker/build-push-action@v6
-        with:
-          context: apps/new-api
-          file: apps/new-api/Dockerfile
-          push: true
-          tags: |
-            ghcr.io/${{ steps.registry.outputs.namespace }}/tapcanvas-new-api:sha-${{ github.sha }}
-            ghcr.io/${{ steps.registry.outputs.namespace }}/tapcanvas-new-api:${{ github.ref_name }}
-          cache-from: type=gha,scope=new-api
-          cache-to: type=gha,mode=max,scope=new-api
-
-      - name: Publish New API database initializer image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/Dockerfile.new-api-patch
-          push: true
-          tags: |
-            ghcr.io/${{ steps.registry.outputs.namespace }}/tapcanvas-new-api-patch:sha-${{ github.sha }}
-            ghcr.io/${{ steps.registry.outputs.namespace }}/tapcanvas-new-api-patch:${{ github.ref_name }}
-          cache-from: type=gha,scope=new-api-patch
-          cache-to: type=gha,mode=max,scope=new-api-patch
+            ghcr.io/${{ steps.registry.outputs.namespace }}/${{ matrix.image }}:sha-${{ github.sha }}
+            ghcr.io/${{ steps.registry.outputs.namespace }}/${{ matrix.image }}:${{ github.ref_name }}
+          cache-from: type=gha,scope=${{ matrix.cache_scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cache_scope }}

@@ -1,6 +1,6 @@
 # TapCanvas 镜像部署
 
-`deploy/compose.yml` 是生产环境的镜像消费清单：运行时不挂载仓库源码、不在容器启动阶段安装依赖，也不会自动执行数据库结构修改。
+`deploy/compose.yml` 是生产环境的镜像消费清单：运行时不挂载仓库源码、不在容器启动阶段安装依赖，也不会自动执行数据库结构修改。New API 的管理界面由镜像内嵌的已构建静态资产提供，不依赖宿主机的 `WEB_DIST_DIR` 目录。
 
 ## 镜像组成
 
@@ -29,7 +29,7 @@ docker compose -f compose.yml -f compose.build.yml push
 
 `compose.build.yml` 只是构建覆盖层；正式服务器只需要 `compose.yml`、`.env` 和 Docker，不需要源码树。
 
-仓库推送到 `main` 或创建 `v*` tag 后，GitHub Actions 会自动发布同名镜像到 GHCR。部署时应优先使用 `sha-<commit>` 标签或镜像 digest，而不是可变的分支标签。
+仓库推送到 `main` 或创建 `v*` tag 后，GitHub Actions 会自动发布同名镜像到 GHCR。五个镜像采用独立矩阵任务发布：一个镜像失败不会阻断其他镜像的构建与日志输出。部署时应优先使用 `sha-<commit>` 标签或镜像 digest，而不是可变的分支标签。
 
 ## 首次部署
 
