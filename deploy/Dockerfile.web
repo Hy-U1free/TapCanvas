@@ -15,10 +15,11 @@ WORKDIR /workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/web/package.json ./apps/web/package.json
 COPY apps/hono-api/package.json ./apps/hono-api/package.json
+COPY apps/hono-api/prisma ./apps/hono-api/prisma
 COPY packages ./packages
 
 RUN --mount=type=cache,target=/pnpm/store,sharing=locked \
-    pnpm install --frozen-lockfile --filter @tapcanvas/web...
+    pnpm install --frozen-lockfile --filter @tapcanvas/web... --filter @tapcanvas/api...
 
 COPY apps/web ./apps/web
 COPY apps/hono-api/src ./apps/hono-api/src
