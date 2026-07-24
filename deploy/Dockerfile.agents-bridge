@@ -10,6 +10,7 @@ RUN corepack enable && corepack prepare pnpm@10.8.1 --activate
 WORKDIR /opt/tapcanvas
 
 COPY apps/agents-cli/package.json apps/agents-cli/pnpm-lock.yaml ./
+COPY apps/agents-cli/scripts ./scripts
 
 RUN --mount=type=cache,target=/pnpm/store,sharing=locked \
     pnpm install --frozen-lockfile
