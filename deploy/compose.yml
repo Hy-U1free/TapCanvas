@@ -103,6 +103,8 @@ services:
       SQL_DSN: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in deploy/.env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}@postgres:5432/${NEW_API_POSTGRES_DB:?Set NEW_API_POSTGRES_DB in deploy/.env}
       REDIS_CONN_STRING: redis://redis:6379
       TAPCANVAS_INTERNAL_TOKEN: ${NEW_API_INTERNAL_TOKEN:?Set NEW_API_INTERNAL_TOKEN in deploy/.env}
+      SESSION_SECRET: ${NEW_API_SESSION_SECRET:?Set NEW_API_SESSION_SECRET in deploy/.env}
+      CRYPTO_SECRET: ${NEW_API_CRYPTO_SECRET:?Set NEW_API_CRYPTO_SECRET in deploy/.env}
     volumes:
       - tapcanvas_new_api_data:/data
       - tapcanvas_new_api_logs:/app/logs

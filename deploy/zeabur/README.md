@@ -103,6 +103,8 @@ PORT=4455
 SQL_DSN=postgresql://tapcanvas:<POSTGRES_PASSWORD>@<POSTGRES_PRIVATE_HOST>:5432/tapcanvas_new_api
 REDIS_CONN_STRING=redis://<REDIS_PRIVATE_HOST>:6379
 TAPCANVAS_INTERNAL_TOKEN=<随机长密钥>
+SESSION_SECRET=<随机长密钥>
+CRYPTO_SECRET=<随机长密钥>
 ```
 
 New API 就绪后，在其管理后台创建供 Agents Bridge 使用的访问令牌，保存为下方的 `AGENTS_API_KEY`。同时按你的模型供应商配置渠道与模型；未配置渠道时，Agents 无法实际调用模型。
@@ -145,8 +147,6 @@ PG_BACKUP_DIR=/app/backups
 JWT_SECRET=<随机长密钥>
 INTERNAL_WORKER_TOKEN=<随机长密钥>
 NEW_API_INTERNAL_TOKEN=<与 New API 完全相同的随机长密钥>
-NEW_API_SESSION_SECRET=<随机长密钥>
-NEW_API_CRYPTO_SECRET=<随机长密钥>
 ```
 
 按需补充对象存储、邮件、支付等集成变量；这些变量与 `deploy/.env.example` 一致。
