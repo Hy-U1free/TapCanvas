@@ -5,6 +5,8 @@ services:
     image: ${TAPCANVAS_WEB_IMAGE:?Set TAPCANVAS_WEB_IMAGE in deploy/.env}
     pull_policy: always
     restart: unless-stopped
+    environment:
+      API_UPSTREAM: ${API_UPSTREAM:-http://api:8788}
     ports:
       - "${WEB_PORT:-8080}:80"
     depends_on:

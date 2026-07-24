@@ -30,12 +30,17 @@ ENV NODE_ENV=production \
 
 WORKDIR /runtime/workspace
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends util-linux \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build --chown=node:node /opt/tapcanvas/node_modules /opt/tapcanvas/node_modules
 COPY --from=build --chown=node:node /opt/tapcanvas/dist /opt/tapcanvas/dist
 COPY --from=build --chown=node:node /opt/tapcanvas/skills /opt/tapcanvas/skills
+COPY --chown=root:root deploy/scripts/start-agents-bridge.sh /usr/local/bin/start-agents-bridge
 
-USER node
+RUN chmod 0555 /usr/local/bin/start-agents-bridge
 
 EXPOSE 8799
 
-CMD ["node", "/opt/tapcanvas/dist/cli/index.js", "serve", "--host", "0.0.0.0", "--port", "8799", "--body-limit", "8000000"]
+CMD ["/usr/local/bin/start-agents-bridge"]

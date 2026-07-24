@@ -2,6 +2,10 @@
 
 `deploy/compose.yml` 是生产环境的镜像消费清单：运行时不挂载仓库源码、不在容器启动阶段安装依赖，也不会自动执行数据库结构修改。New API 的管理界面由镜像内嵌的已构建静态资产提供，不依赖宿主机的 `WEB_DIST_DIR` 目录。
 
+Web 容器的 API 反向代理地址由 `API_UPSTREAM` 控制，默认值为 Compose 网络中的 `http://api:8788`。在 Zeabur 等使用私有服务域名的平台中，应设置为该平台提供的 API 私有地址。
+
+API 与 Agents Bridge 在启动时会校正其持久目录的权限，然后以非 root 的 `node` 用户运行；这使 Docker volume 与 Zeabur persistent volume 都可写，而不会让应用进程以 root 身份执行。
+
 ## 镜像组成
 
 | 服务 | 镜像变量 | 说明 |
