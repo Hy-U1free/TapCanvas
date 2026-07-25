@@ -59,6 +59,24 @@
 }
 
 :root[data-mantine-color-scheme="light"] {
+  --tc-color-app-bg: #f5f5f7;
+  --tc-color-app-bg-strong: #ffffff;
+  --tc-color-surface: #ffffff;
+  --tc-color-surface-raised: #f5f5f7;
+  --tc-color-surface-subtle: #eceff3;
+  --tc-color-surface-inline: rgba(29, 29, 31, 0.045);
+  --tc-color-surface-inline-weak: rgba(29, 29, 31, 0.03);
+  --tc-color-border-subtle: rgba(29, 29, 31, 0.1);
+  --tc-color-border-strong: rgba(0, 113, 227, 0.3);
+  --tc-color-text-primary: #1d1d1f;
+  --tc-color-text-secondary: rgba(29, 29, 31, 0.72);
+  --tc-color-text-tertiary: rgba(29, 29, 31, 0.48);
+  --tc-color-accent-blue: #0071e3;
+  --tc-color-accent-cyan: #0066cc;
+  --tc-color-success: #16803c;
+  --tc-color-warning: #a15c00;
+  --tc-color-danger: #c5221f;
+  --tc-color-info: #0066cc;
   --handle-color-image: #2563eb;
   --handle-color-audio: #0d9488;
   --handle-color-subtitle: #ca8a04;
@@ -97,9 +115,13 @@ body {
 
 .tc-panel-card {
   border-radius: var(--tc-radius-panel);
-  background: linear-gradient(180deg, rgba(16, 22, 29, 0.98), rgba(10, 14, 20, 0.98));
+  background: var(--tc-color-surface-raised);
   border: 1px solid var(--tc-color-border-subtle);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-mantine-color-scheme="light"] .tc-panel-card {
+  box-shadow: 0 10px 28px rgba(29, 29, 31, 0.1);
 }
 
 .tc-panel-card .tc-panel-card,
