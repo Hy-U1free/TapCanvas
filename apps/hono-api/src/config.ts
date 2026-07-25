@@ -16,6 +16,7 @@ export type AppConfig = {
 	aliyunSmsTemplateCode: string | null;
 	aliyunSmsEndpoint: string | null;
 	firstAdminEmail: string | null;
+	signupBonusCredits: number;
 };
 
 export function getConfig(env: WorkerEnv): AppConfig {
@@ -35,5 +36,9 @@ export function getConfig(env: WorkerEnv): AppConfig {
 		aliyunSmsTemplateCode: env.ALIYUN_SMS_TEMPLATE_CODE ?? null,
 		aliyunSmsEndpoint: env.ALIYUN_SMS_ENDPOINT ?? null,
 		firstAdminEmail: env.FIRST_ADMIN_EMAIL ? String(env.FIRST_ADMIN_EMAIL).trim().toLowerCase() : null,
+		signupBonusCredits: (() => {
+			const raw = Number(env.SIGNUP_BONUS_CREDITS);
+			return Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
+		})(),
 	};
 }

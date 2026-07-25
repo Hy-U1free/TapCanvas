@@ -1,4 +1,5 @@
 import { AppError } from "../../middleware/error";
+import { getConfig } from "../../config";
 import type { AppContext } from "../../types";
 import { resolvePublicAssetBaseUrl } from "../asset/asset.publicBase";
 import type { TeamRole } from "./team.schemas";
@@ -141,9 +142,10 @@ export async function grantSignupBonusToPersonalTeam(
 	const teamId = await ensurePersonalBillingTeam(c, uid);
 	if (!teamId) return;
 	const nowIso = new Date().toISOString();
+	const { signupBonusCredits } = getConfig(c.env);
 	await grantTeamSignupBonusOnce(c.env.DB, {
 		teamId,
-		amount: 100,
+		amount: signupBonusCredits,
 		actorUserId: uid,
 		nowIso,
 	});
@@ -547,7 +549,7 @@ export async function requireSufficientTeamCredits(
 		// Personal accounts are supported via personal credits; guest sessions must provide X-API-Key.
 		if (c.get("publicApi") === true && !isLocalDevRequest(c)) {
 			throw new AppError(
-				"未加入企业/团队也可以使用：请确保账号有可用积分（新用户 GitHub/邮箱/手机号注册赠送 100 积分）。游客模式不赠送积分，可配置 X-API-Key 或先注册登录。",
+				"未加入企业/团队也可以使用：请确保账号有可用积分（新用户注册后积分由管理员设置，可充值后使用）。游客模式不赠送积分，可配置 X-API-Key 或先注册登录。",
 				{
 					status: 402,
 					code: "team_required",

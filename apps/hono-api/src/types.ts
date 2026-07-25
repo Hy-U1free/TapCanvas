@@ -104,6 +104,8 @@ export type WorkerEnv = Record<string, unknown> & {
 	COMMERCE_PLATFORM_OWNER_ID?: string;
 	// Bootstrap: first admin email — grants admin role on first registration when no admin exists
 	FIRST_ADMIN_EMAIL?: string;
+	/** Signup bonus credits granted to new users on registration. Defaults to 0. */
+	SIGNUP_BONUS_CREDITS?: string;
 };
 
 export type AppEnv = {
