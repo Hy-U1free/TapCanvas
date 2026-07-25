@@ -102,6 +102,8 @@ export type WorkerEnv = Record<string, unknown> & {
 	WECHAT_PAY_PRIVATE_KEY_FILE?: string;
 	WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE?: string;
 	COMMERCE_PLATFORM_OWNER_ID?: string;
+	// Bootstrap: first admin email — grants admin role on first registration when no admin exists
+	FIRST_ADMIN_EMAIL?: string;
 };
 
 export type AppEnv = {

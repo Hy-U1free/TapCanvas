@@ -15,6 +15,7 @@ export type AppConfig = {
 	aliyunSmsSignName: string | null;
 	aliyunSmsTemplateCode: string | null;
 	aliyunSmsEndpoint: string | null;
+	firstAdminEmail: string | null;
 };
 
 export function getConfig(env: WorkerEnv): AppConfig {
@@ -33,5 +34,6 @@ export function getConfig(env: WorkerEnv): AppConfig {
 		aliyunSmsSignName: env.ALIYUN_SMS_SIGN_NAME ?? null,
 		aliyunSmsTemplateCode: env.ALIYUN_SMS_TEMPLATE_CODE ?? null,
 		aliyunSmsEndpoint: env.ALIYUN_SMS_ENDPOINT ?? null,
+		firstAdminEmail: env.FIRST_ADMIN_EMAIL ? String(env.FIRST_ADMIN_EMAIL).trim().toLowerCase() : null,
 	};
 }

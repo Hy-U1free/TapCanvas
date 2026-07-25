@@ -1187,6 +1187,7 @@ export async function verifyEmailRegistration(
 	}
 
 	const email = normalizeAuthEmail(rawEmail);
+	const isBootstrapAdmin = Boolean(config.firstAdminEmail) && email === config.firstAdminEmail;
 	const prisma = getPrismaClient();
 	const nowIso = new Date().toISOString();
 	const row = await prisma.email_login_codes.findFirst({
@@ -1265,6 +1266,19 @@ export async function verifyEmailRegistration(
 				if (unavailable) return { ok: false, response: unavailable };
 			}
 
+			// Bootstrap first admin: if FIRST_ADMIN_EMAIL is set and matches, and no admin exists, grant admin
+			let grantBootstrapAdmin = false;
+			if (isBootstrapAdmin) {
+				const adminCount = await transaction.users.count({
+					where: {
+						role: "admin",
+						disabled: 0,
+						OR: [{ deleted_at: null }, { deleted_at: "" }],
+					},
+				});
+				grantBootstrapAdmin = adminCount === 0;
+			}
+
 			const consumed = await transaction.email_login_codes.updateMany({
 				where: {
 					id: row.id,
@@ -1290,6 +1304,7 @@ export async function verifyEmailRegistration(
 						password_updated_at: nowIso,
 						last_seen_at: nowIso,
 						updated_at: nowIso,
+						...(grantBootstrapAdmin ? { role: "admin" } : {}),
 					},
 				});
 				return {
@@ -1297,6 +1312,7 @@ export async function verifyEmailRegistration(
 					account: {
 						...existingAccount,
 						email,
+						role: grantBootstrapAdmin ? "admin" : (existingAccount.role ?? null),
 						password_hash: passwordRecord.hash,
 						password_salt: passwordRecord.salt,
 					},
@@ -1305,7 +1321,7 @@ export async function verifyEmailRegistration(
 
 			const userId = `email_${await sha256Hex(email)}`;
 			const login = normalizeEmailLocalPart(email);
-			const initialRole = resolveLocalDevRole(c, null);
+			const initialRole = grantBootstrapAdmin ? "admin" : resolveLocalDevRole(c, null);
 			await transaction.users.create({
 				data: {
 					id: userId,
