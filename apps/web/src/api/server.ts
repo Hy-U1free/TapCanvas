@@ -17,6 +17,14 @@ export const API_BASE =
   explicitApiBase ||
   (viteEnv.DEV ? 'http://localhost:8788' : '')
 
+/** new URL(path) throws when path is relative and no base is given.
+ *  In production API_BASE is '' so we always provide window.location.href
+ *  as fallback base, which is valid for both absolute and relative paths. */
+function buildApiUrl(path: string): URL {
+  const base = typeof window !== 'undefined' ? window.location.href : 'http://localhost'
+  return new URL(path, base)
+}
+
 function buildProxyImageUrl(rawImageUrl: string): string {
   const trimmed = rawImageUrl.trim()
   const suffix = `/assets/proxy-image?url=${encodeURIComponent(trimmed)}`
@@ -3259,7 +3267,7 @@ export async function listModelCatalogVendors(): Promise<ModelCatalogVendorDto[]
 }
 
 export async function exportModelCatalogPackage(params?: { includeApiKeys?: boolean }): Promise<ModelCatalogImportPackageDto> {
-  const u = new URL(`${API_BASE}/model-catalog/export`)
+  const u = buildApiUrl(`${API_BASE}/model-catalog/export`)
   if (params?.includeApiKeys) u.searchParams.set('includeApiKeys', 'true')
   const r = await apiFetch(u.toString(), withAuth())
   if (!r.ok) {
@@ -3327,7 +3335,7 @@ export async function clearModelCatalogVendorApiKey(vendorKey: string): Promise<
 }
 
 export async function listModelCatalogModels(params?: { vendorKey?: string; kind?: BillingModelKind; enabled?: boolean }): Promise<ModelCatalogModelDto[]> {
-  const u = new URL(`${API_BASE}/model-catalog/models`)
+  const u = buildApiUrl(`${API_BASE}/model-catalog/models`)
   if (params?.vendorKey) u.searchParams.set('vendorKey', params.vendorKey)
   if (params?.kind) u.searchParams.set('kind', params.kind)
   if (typeof params?.enabled === 'boolean') u.searchParams.set('enabled', params.enabled ? 'true' : 'false')
@@ -3368,7 +3376,7 @@ export async function upsertModelCatalogModel(payload: {
 }
 
 export async function deleteModelCatalogModel(vendorKey: string, modelKey: string): Promise<void> {
-  const u = new URL(`${API_BASE}/model-catalog/models/${encodeURIComponent(modelKey)}`)
+  const u = buildApiUrl(`${API_BASE}/model-catalog/models/${encodeURIComponent(modelKey)}`)
   u.searchParams.set('vendorKey', vendorKey)
   const r = await apiFetch(u.toString(), withAuth({ method: 'DELETE' }))
   if (!r.ok) {
@@ -3379,7 +3387,7 @@ export async function deleteModelCatalogModel(vendorKey: string, modelKey: strin
 }
 
 export async function listModelCatalogMappings(params?: { vendorKey?: string; taskKind?: ProfileKind; enabled?: boolean }): Promise<ModelCatalogMappingDto[]> {
-  const u = new URL(`${API_BASE}/model-catalog/mappings`)
+  const u = buildApiUrl(`${API_BASE}/model-catalog/mappings`)
   if (params?.vendorKey) u.searchParams.set('vendorKey', params.vendorKey)
   if (params?.taskKind) u.searchParams.set('taskKind', params.taskKind)
   if (typeof params?.enabled === 'boolean') u.searchParams.set('enabled', params.enabled ? 'true' : 'false')
@@ -3440,7 +3448,7 @@ export async function listTaskLogs(params?: {
   status?: VendorCallLogStatus | null
   taskKind?: string | null
 }): Promise<VendorCallLogListResponseDto> {
-  const u = new URL(`${API_BASE}/tasks/logs`)
+  const u = buildApiUrl(`${API_BASE}/tasks/logs`)
   if (typeof params?.limit === 'number' && Number.isFinite(params.limit)) u.searchParams.set('limit', String(params.limit))
   if (params?.before) u.searchParams.set('before', params.before)
   if (params?.vendor) u.searchParams.set('vendor', params.vendor)
