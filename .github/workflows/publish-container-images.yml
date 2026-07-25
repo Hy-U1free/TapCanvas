@@ -70,5 +70,6 @@ jobs:
           tags: |
             ghcr.io/${{ steps.registry.outputs.namespace }}/${{ matrix.image }}:sha-${{ github.sha }}
             ghcr.io/${{ steps.registry.outputs.namespace }}/${{ matrix.image }}:${{ github.ref_name }}
+            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/{1}:latest', steps.registry.outputs.namespace, matrix.image) || '' }}
           cache-from: type=gha,scope=${{ matrix.cache_scope }}
           cache-to: type=gha,mode=max,scope=${{ matrix.cache_scope }}
