@@ -33,6 +33,52 @@ internalRouter.use("*", async (c, next) => {
 	await next();
 });
 
+const BootstrapAdminRequestSchema = z
+	.object({
+		email: z.string().email(),
+	})
+	.strict();
+
+// One-shot: grant admin role to a user by email (requires INTERNAL_WORKER_TOKEN).
+// Safe to call even when admins already exist — only upgrades the target account.
+internalRouter.post("/bootstrap-admin", async (c) => {
+	const body = (await c.req.json().catch(() => ({}))) ?? {};
+	const parsed = BootstrapAdminRequestSchema.safeParse(body);
+	if (!parsed.success) {
+		return c.json({ error: "Invalid request body", issues: parsed.error.issues }, 400);
+	}
+
+	const email = parsed.data.email.trim().toLowerCase();
+	const prisma = getPrismaClient();
+
+	const user = await prisma.users.findFirst({
+		where: { email: { equals: email, mode: "insensitive" } },
+		select: { id: true, login: true, email: true, role: true, disabled: true, deleted_at: true },
+	});
+
+	if (!user) {
+		return c.json({ error: "User not found", email }, 404);
+	}
+	if (user.deleted_at) {
+		return c.json({ error: "User is deleted", email }, 400);
+	}
+
+	const nowIso = new Date().toISOString();
+	await prisma.users.update({
+		where: { id: user.id },
+		data: { role: "admin", updated_at: nowIso },
+	});
+
+	return c.json({
+		ok: true,
+		userId: user.id,
+		login: user.login,
+		email: user.email,
+		previousRole: user.role ?? null,
+		role: "admin",
+	});
+});
+
 const CreditFinalizerRunRequestSchema = z
 	.object({
 		limit: z.number().int().min(1).max(100).optional(),
